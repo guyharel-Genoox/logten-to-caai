@@ -1,0 +1,73 @@
+"""
+Named constants for Excel column indices in the flight logbook.
+
+The logbook has 48 base columns (created by logbook_creator.py) plus
+8 CAAI columns (added by caai_columns.py) for a total of 56 columns.
+All indices are 1-based (matching openpyxl convention).
+"""
+
+# ============ Flight Log Sheet - Base Columns (1-48) ============
+
+COL_ROW_NUM = 1
+COL_DATE = 2
+COL_FROM = 3
+COL_TO = 4
+COL_ROUTE = 5
+COL_REGISTRATION = 6
+COL_AIRCRAFT_TYPE = 7
+COL_MAKE = 8
+COL_MODEL = 9
+COL_ENGINE_TYPE = 10
+COL_CATEGORY = 11
+COL_CLASS = 12
+COL_TOTAL_TIME = 13
+COL_PIC = 14
+COL_SIC = 15
+COL_NIGHT = 16
+COL_CROSS_COUNTRY = 17
+COL_ACTUAL_INSTRUMENT = 18
+COL_SIMULATED_INSTRUMENT = 19
+COL_DUAL_RECEIVED = 20
+COL_DUAL_GIVEN = 21
+COL_SOLO = 22
+COL_SIMULATOR = 23
+COL_MULTI_PILOT = 24
+COL_DAY_LANDINGS = 25
+COL_DAY_TAKEOFFS = 26
+COL_NIGHT_LANDINGS = 27
+COL_NIGHT_TAKEOFFS = 28
+COL_APPROACH_1 = 29
+COL_APPROACH_2 = 30
+COL_APPROACH_3 = 31
+COL_APPROACH_4 = 32
+COL_HOLDS = 33
+COL_IFR = 34
+COL_GO_AROUNDS = 35
+COL_PIC_NAME = 36
+COL_INSTRUCTOR = 37
+COL_STUDENT = 38
+COL_OBSERVER = 39
+COL_DPE = 40
+COL_DISTANCE = 41
+COL_REMARKS = 42
+COL_COMPLEX = 43
+COL_HIGH_PERF = 44
+COL_EFIS = 45
+COL_RETRACTABLE = 46
+COL_PRESSURIZED = 47
+COL_REVIEW_IPC = 48
+
+# ============ CAAI Columns (49-56, added by caai_columns.py) ============
+
+COL_CAAI_ROLE = 49
+COL_CAAI_GROUP = 50
+COL_DAY_TIME = 51
+COL_NIGHT_TIME = 52
+COL_XC_FLAG = 53
+COL_IS_SIMULATOR = 54
+COL_IS_COMPLEX = 55
+COL_DUAL_INSTRUMENT = 56
+
+# Total column count
+TOTAL_COLUMNS = 56
+BASE_COLUMNS = 48
