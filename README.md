@@ -31,6 +31,18 @@ cp config.example.ini config.ini
 
 ## Quick Start
 
+### Web Interface (Easiest)
+
+No config needed — just upload your file:
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn web.app:app
+# Open http://localhost:8000
+```
+
+Upload your logbook, get a filled tofes-shaot form back.
+
 ### Option A: Any Logbook (Excel, CSV, PDF)
 
 ```bash
@@ -176,6 +188,10 @@ logten-to-caai/
 │   ├── caai_columns.py          # Add CAAI classification columns
 │   ├── caai_form_filler.py      # Fill tofes-shaot form
 │   └── caai_analyzer.py         # Verification tool
+├── web/
+│   ├── app.py                   # FastAPI web server
+│   ├── index.html               # Upload page
+│   └── static/style.css         # Styles
 ├── templates/
 │   └── tofes-shaot-blank.xlsx   # Blank CAAI form template
 └── docs/

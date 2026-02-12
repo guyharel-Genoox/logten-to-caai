@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAAI Flight Logbook Converter | ממיר יומן טיסות לרת"א</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CAAI Tofes-Shaot Converter</h1>
+            <p class="subtitle">ממיר יומן טיסות לטופס שעות רת"א</p>
+            <p class="desc">Upload your flight logbook (Excel, CSV, or PDF) and get a filled CAAI tofes-shaot form</p>
+        </header>
+
+        <!-- Upload Section -->
+        <div id="upload-section" class="card">
+            <div id="drop-zone" class="drop-zone">
+                <div class="drop-icon">&#9992;</div>
+                <p class="drop-text">Drag & drop your logbook here</p>
+                <p class="drop-sub">or click to browse</p>
+                <p class="drop-formats">Supports: .xlsx .csv .tsv .pdf .txt (LogTen Pro)</p>
+                <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.tsv,.txt,.pdf" hidden>
+            </div>
+
+            <div id="file-info" class="file-info" hidden>
+                <span id="file-name" class="file-name"></span>
+                <button id="clear-btn" class="btn-clear" title="Remove file">&times;</button>
+            </div>
+
+            <div class="form-row">
+                <label for="pilot-name">Pilot Name (optional)</label>
+                <input type="text" id="pilot-name" placeholder="Your Name / השם שלך" dir="auto">
+            </div>
+
+            <button id="convert-btn" class="btn-primary" disabled>
+                Convert to CAAI Form
+            </button>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progress-section" class="card" hidden>
+            <div class="spinner"></div>
+            <p class="progress-text">Processing your logbook...</p>
+            <p class="progress-sub">This may take a few seconds</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="card" hidden>
+            <h2>Conversion Complete &#10003;</h2>
+
+            <div class="stats-grid">
+                <div class="stat">
+                    <span class="stat-value" id="stat-total-hours">-</span>
+                    <span class="stat-label">Total Hours<br>סה"כ שעות</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-pic">-</span>
+                    <span class="stat-label">PIC<br>טייס אחראי</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-sic">-</span>
+                    <span class="stat-label">SIC<br>טייס משנה</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-student">-</span>
+                    <span class="stat-label">Student<br>מתלמד</span>
+                </div>
+                <div class="stat highlight">
+                    <span class="stat-value" id="stat-grand">-</span>
+                    <span class="stat-label">CAAI Grand Total<br>סה"כ רת"א (עם חצי SIC)</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-night">-</span>
+                    <span class="stat-label">Night<br>לילה</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-xc">-</span>
+                    <span class="stat-label">Cross Country<br>חוצה ארץ</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="stat-instrument">-</span>
+                    <span class="stat-label">Instrument<br>מכשירים</span>
+                </div>
+            </div>
+
+            <div class="download-buttons">
+                <a id="download-caai" class="btn-download" href="#">
+                    &#128196; Download Filled Tofes-Shaot
+                    <span class="btn-sub">הורד טופס שעות מלא</span>
+                </a>
+                <a id="download-logbook" class="btn-secondary" href="#">
+                    &#128203; Download Standardized Logbook
+                    <span class="btn-sub">הורד יומן טיסות מתוקנן</span>
+                </a>
+            </div>
+
+            <button id="new-btn" class="btn-outline">Convert Another File</button>
+        </div>
+
+        <!-- Error Section -->
+        <div id="error-section" class="card error-card" hidden>
+            <h2>&#9888; Error</h2>
+            <p id="error-message"></p>
+            <button id="retry-btn" class="btn-outline">Try Again</button>
+        </div>
+
+        <footer>
+            <p>
+                <a href="https://github.com/guyharel-Genoox/logten-to-caai" target="_blank">GitHub</a>
+                &middot; All CAAI rules enforced including SIC half-credit per regulation 42(b)
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const fileName = document.getElementById('file-name');
+        const clearBtn = document.getElementById('clear-btn');
+        const convertBtn = document.getElementById('convert-btn');
+        const pilotName = document.getElementById('pilot-name');
+        const uploadSection = document.getElementById('upload-section');
+        const progressSection = document.getElementById('progress-section');
+        const resultsSection = document.getElementById('results-section');
+        const errorSection = document.getElementById('error-section');
+
+        let selectedFile = null;
+
+        // Drag & drop
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) selectFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) selectFile(fileInput.files[0]);
+        });
+
+        function selectFile(file) {
+            selectedFile = file;
+            fileName.textContent = file.name + ' (' + formatSize(file.size) + ')';
+            fileInfo.hidden = false;
+            dropZone.style.display = 'none';
+            convertBtn.disabled = false;
+        }
+
+        clearBtn.addEventListener('click', () => {
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfo.hidden = true;
+            dropZone.style.display = '';
+            convertBtn.disabled = true;
+        });
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Convert
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            uploadSection.hidden = true;
+            progressSection.hidden = false;
+            resultsSection.hidden = true;
+            errorSection.hidden = true;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('pilot_name', pilotName.value);
+
+            try {
+                const resp = await fetch('/api/convert', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await resp.json();
+
+                progressSection.hidden = true;
+
+                if (data.success) {
+                    showResults(data);
+                } else {
+                    showError(data.error || 'Unknown error occurred');
+                }
+            } catch (err) {
+                progressSection.hidden = true;
+                showError('Network error: ' + err.message);
+            }
+        });
+
+        function showResults(data) {
+            const s = data.stats;
+            document.getElementById('stat-total-hours').textContent = s.total_hours;
+            document.getElementById('stat-pic').textContent = s.pic;
+            document.getElementById('stat-sic').textContent = s.sic;
+            document.getElementById('stat-student').textContent = s.student;
+            document.getElementById('stat-grand').textContent = s.caai_grand_total;
+            document.getElementById('stat-night').textContent = s.night;
+            document.getElementById('stat-xc').textContent = s.xc;
+            document.getElementById('stat-instrument').textContent = s.instrument;
+
+            document.getElementById('download-caai').href = data.download_url;
+            document.getElementById('download-logbook').href = data.logbook_url;
+
+            resultsSection.hidden = false;
+        }
+
+        function showError(msg) {
+            document.getElementById('error-message').textContent = msg;
+            errorSection.hidden = false;
+        }
+
+        // Reset buttons
+        document.getElementById('new-btn').addEventListener('click', reset);
+        document.getElementById('retry-btn').addEventListener('click', reset);
+
+        function reset() {
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfo.hidden = true;
+            dropZone.style.display = '';
+            convertBtn.disabled = true;
+            uploadSection.hidden = false;
+            progressSection.hidden = true;
+            resultsSection.hidden = true;
+            errorSection.hidden = true;
+        }
+    </script>
+</body>
+</html>
