@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-LogTen Pro to Israeli CAAI tofes-shaot pipeline runner.
+Flight logbook to Israeli CAAI tofes-shaot pipeline runner.
 
-Converts a Coradine LogTen Pro flight log export into:
-1. A comprehensive Excel flight logbook (4 sheets)
+Converts any flight logbook (Excel, CSV, PDF, or LogTen Pro export) into:
+1. A standardized Excel flight logbook (48 columns)
 2. Distance calculations for all flights
 3. CAAI classification columns
 4. A filled CAAI tofes-shaot form (Summary, CPL, ATPL sheets)
 
 Usage:
-    python run.py                              # Full pipeline using config.ini
-    python run.py --export flights.txt         # Override input file
-    python run.py --step logbook               # Run single step
-    python run.py --step distances
-    python run.py --step caai-columns
-    python run.py --step fill-form
-    python run.py --step analyze               # Optional verification
+    python run.py --input flights.xlsx                    # Any Excel logbook
+    python run.py --input flights.csv                     # CSV logbook
+    python run.py --input flights.pdf                     # PDF logbook
+    python run.py --input "Export Flights (Tab).txt" --format logten  # LogTen Pro
+    python run.py                                         # Uses config.ini
+    python run.py --step fill-form                        # Run single step
+    python run.py --step analyze                          # Verify CAAI compliance
 """
 
 import argparse
@@ -25,17 +25,43 @@ import os
 from src.config import Config
 
 
-STEPS = ['logbook', 'distances', 'caai-columns', 'fill-form', 'analyze']
+STEPS = ['import', 'distances', 'caai-columns', 'fill-form', 'analyze']
+# Keep 'logbook' as hidden alias for backward compatibility
+STEP_ALIASES = {'logbook': 'import'}
 
 
-def run_logbook(config):
-    """Step 1: Create Excel logbook from LogTen Pro export."""
-    from src.logbook_creator import create_logbook
+def run_import(config):
+    """Step 1: Import flight data into standardized Excel logbook.
+
+    Auto-detects the source format and column layout, or uses explicit
+    settings from config/CLI.
+    """
+    source, fmt = config.get_import_source()
+
     print("\n" + "=" * 70)
-    print("STEP 1: Creating flight logbook from LogTen Pro export")
+    print("STEP 1: Importing flight data")
     print("=" * 70)
-    config.validate('logbook')
-    create_logbook(config.logten_export, config.logbook_output, config.pilot_name)
+    print(f"  Source: {source}")
+    print(f"  Format: {fmt}")
+
+    config.validate('import')
+
+    if fmt == 'logten':
+        # Use the original LogTen Pro importer
+        from src.logbook_creator import create_logbook
+        print("  Using LogTen Pro importer")
+        create_logbook(source, config.logbook_output, config.pilot_name)
+    else:
+        # Use universal importer
+        from src.universal_importer import create_standardized_logbook
+        print("  Using universal importer")
+        create_standardized_logbook(
+            input_file=source,
+            output_file=config.logbook_output,
+            pilot_name=config.pilot_name,
+            fmt=fmt,
+            column_mapping=config.column_mapping or None,
+        )
 
 
 def run_distances(config):
@@ -80,7 +106,8 @@ def run_analyze(config):
 
 
 STEP_FUNCTIONS = {
-    'logbook': run_logbook,
+    'import': run_import,
+    'logbook': run_import,  # backward compat alias
     'distances': run_distances,
     'caai-columns': run_caai_columns,
     'fill-form': run_fill_form,
@@ -90,74 +117,113 @@ STEP_FUNCTIONS = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description='LogTen Pro to Israeli CAAI tofes-shaot pipeline',
+        description='Flight logbook to Israeli CAAI tofes-shaot pipeline',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Steps (run in order, or individually with --step):
-  logbook        Create Excel logbook from LogTen Pro export
+  import         Import flight data from any format (Excel, CSV, PDF, LogTen)
   distances      Add great-circle distances to logbook
   caai-columns   Add CAAI classification columns to logbook
   fill-form      Fill CAAI tofes-shaot form from logbook
   analyze        Verify CAAI categorization (optional)
 
+Supported input formats:
+  .xlsx / .xls   Excel spreadsheet
+  .csv           Comma-separated values
+  .tsv / .txt    Tab-separated values
+  .pdf           PDF with tabular data
+  LogTen Pro     Tab-delimited export (auto-detected or --format logten)
+
 Examples:
-  python run.py                              # Run full pipeline
-  python run.py --step fill-form             # Run only form filling
-  python run.py --export "my_flights.txt"    # Override input file
+  python run.py --input my_logbook.xlsx                   # Excel logbook
+  python run.py --input flights.csv                       # CSV logbook
+  python run.py --input logbook.pdf                       # PDF logbook
+  python run.py --input flights.csv --mapping columns.ini # With column mapping
+  python run.py --input export.txt --format logten        # LogTen Pro export
+  python run.py                                           # Use config.ini
+  python run.py --step fill-form                          # Run only form filling
         """,
     )
     parser.add_argument('--config', '-c', default='config.ini',
                         help='Config file path (default: config.ini)')
-    parser.add_argument('--step', '-s', choices=STEPS,
+    parser.add_argument('--step', '-s', choices=STEPS + ['logbook'],
                         help='Run only this step')
-    parser.add_argument('--export', '-e', default=None,
-                        help='Override LogTen export file path')
+    parser.add_argument('--input', '-i', default=None,
+                        help='Input file (any format: Excel, CSV, PDF, LogTen)')
+    parser.add_argument('--format', '-f', default=None,
+                        choices=['auto', 'excel', 'csv', 'tsv', 'pdf', 'logten'],
+                        help='Input format (default: auto-detect)')
+    parser.add_argument('--mapping', '-m', default=None,
+                        help='Column mapping INI file (default: auto-detect)')
     parser.add_argument('--logbook', '-l', default=None,
-                        help='Override logbook file path')
+                        help='Override logbook output file path')
     parser.add_argument('--pilot', '-p', default=None,
                         help='Override pilot name')
     parser.add_argument('--template', '-t', default=None,
                         help='Override CAAI form template path')
     parser.add_argument('--output', '-o', default=None,
                         help='Override CAAI form output path')
+    # Keep --export for backward compatibility
+    parser.add_argument('--export', '-e', default=None,
+                        help=argparse.SUPPRESS)  # hidden, backward compat
 
     args = parser.parse_args()
+
+    # Resolve step aliases
+    step = args.step
+    if step in STEP_ALIASES:
+        step = STEP_ALIASES[step]
 
     # Load config
     config = Config.from_file(args.config)
 
     # Apply CLI overrides
+    if args.input:
+        config.override(input_file=args.input)
+    elif args.export:
+        # Backward compat: --export sets logten format
+        config.override(input_file=args.export, input_format='logten')
+
     config.override(
-        logten_export=args.export,
+        input_format=args.format,
+        column_mapping=args.mapping,
         logbook_output=args.logbook,
         pilot_name=args.pilot,
         caai_template=args.template,
         caai_output=args.output,
     )
 
-    print("LogTen Pro -> CAAI tofes-shaot Pipeline")
+    # If no input_file but logten_export is set, use it (backward compat)
+    if not config.input_file and config.logten_export:
+        config.input_file = config.logten_export
+        if config.input_format == 'auto':
+            config.input_format = 'logten'
+
+    source, fmt = config.get_import_source()
+
+    print("Flight Logbook -> CAAI tofes-shaot Pipeline")
     print("=" * 70)
     print(f"Config: {os.path.abspath(args.config)}")
     if config.pilot_name:
         print(f"Pilot: {config.pilot_name}")
-    print(f"LogTen export: {config.logten_export}")
+    print(f"Input: {source or '(not set)'} [{fmt or 'auto'}]")
     print(f"Logbook: {config.logbook_output}")
     print(f"CAAI template: {config.caai_template}")
     print(f"CAAI output: {config.caai_output}")
 
     try:
-        if args.step:
+        if step:
             # Run single step
-            STEP_FUNCTIONS[args.step](config)
+            STEP_FUNCTIONS[step](config)
         else:
             # Run full pipeline (steps 1-4, skip analyze)
-            for step in ['logbook', 'distances', 'caai-columns', 'fill-form']:
-                STEP_FUNCTIONS[step](config)
+            for s in ['import', 'distances', 'caai-columns', 'fill-form']:
+                STEP_FUNCTIONS[s](config)
 
         print("\n" + "=" * 70)
         print("PIPELINE COMPLETE")
         print("=" * 70)
-        if not args.step or args.step == 'fill-form':
+        if not step or step == 'fill-form':
             print(f"\nOutput files:")
             print(f"  Logbook: {config.logbook_output}")
             print(f"  CAAI form: {config.caai_output}")
